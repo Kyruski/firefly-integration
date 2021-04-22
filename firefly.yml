@@ -1,6 +1,7 @@
 contexts:
   firefly: ~
-  firefly_integration: ~
+  firefly_integration:
+    is_extension: true
 
 environments:
   dev: ~

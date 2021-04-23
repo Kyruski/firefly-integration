@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from io import StringIO
 from dataclasses import fields
+from pprint import pprint
 from typing import Type
 
 import firefly as ff
@@ -41,7 +43,6 @@ class MapReduce(ff.DomainService):
         without_partitions = criteria.prune(self._get_all_criteria_attributes(partitions, criteria))
         chunks = [keys[x:x+6] for x in range(0, len(keys), 6)]
         results = self._batch_process(self._invoke_mapper, [(chunk, fields_, without_partitions) for chunk in chunks])
-        results = list(map(lambda r: pd.read_csv(r), results))
 
         ret = pd.concat(results)
 
@@ -54,7 +55,7 @@ class MapReduce(ff.DomainService):
         data = self._message_transport.request(
             self._message_factory.query(f'{self._context}.Map', criteria, {'keys': keys, 'fields': fields_})
         )
-        return pd.read_csv(data)
+        return pd.read_csv(StringIO(data))
 
     def _list_partition(self, path: str):
         return self._file_system.list(path)

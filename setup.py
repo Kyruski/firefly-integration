@@ -41,12 +41,9 @@ setuptools.setup(
     package_dir={'': 'src'},
     install_requires=[
         'firefly-framework>=1.1.53',
-        'pandas>=1.2.4',
+        'awswrangler>=2.7.0',
         'moz-sql-parser>=4.21',
     ],
-    extras_require={
-        'parquet': ['fastparquet>=0.5.0'],
-    },
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "Operating System :: OS Independent",

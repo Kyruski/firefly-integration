@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from io import StringIO
+
 import firefly as ff
 import pandas as pd
 
@@ -19,4 +21,4 @@ class Map(ff.ApplicationService):
 
     def _read(self, key: str, fields: list, criteria: ff.BinaryOp):
         data = self._file_system.filter(key, fields, criteria)
-        return pd.read_json(data)
+        return pd.read_json(StringIO(data))

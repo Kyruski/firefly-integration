@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import fields
-from pprint import pprint
 from typing import Type
 
 import firefly as ff
 import pandas as pd
 from moz_sql_parser import parse
-
 
 OPS = {
     'eq': '==', 'ne': '!=', 'lt': '<', 'gt': '>', 'lte': '<=', 'gte': '>=', 'is': 'is'
@@ -29,7 +27,7 @@ class MapReduce(ff.DomainService):
     def __call__(self, path: str, sql: str, entity: Type[ff.Entity], partitions: list = None):
         self._non_partition_keys = []
         query = parse(sql)
-        fields = query['select']
+        fields_ = query['select']
 
         criteria = None
         if 'where' in query:
@@ -42,7 +40,8 @@ class MapReduce(ff.DomainService):
 
         without_partitions = criteria.prune(self._get_all_criteria_attributes(partitions, criteria))
         chunks = [keys[x:x+6] for x in range(0, len(keys), 6)]
-        results = self._batch_process(self._invoke_mapper, [(chunk, fields, without_partitions) for chunk in chunks])
+        results = self._batch_process(self._invoke_mapper, [(chunk, fields_, without_partitions) for chunk in chunks])
+        results = list(map(lambda r: pd.read_csv(r), results))
 
         ret = pd.concat(results)
 

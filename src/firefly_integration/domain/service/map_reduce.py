@@ -48,8 +48,10 @@ class MapReduce(ff.DomainService):
 
         sort, unique = self._get_entity_order_and_unique_indexes(entity)
         ret.sort_values(sort, inplace=True)
+        ret.drop_duplicates(subset=unique, keep='last', inplace=True)
+        ret.set_index(['id'], inplace=True)
 
-        return ret[~ret.duplicated(subset=unique, keep='last')]
+        return ret
 
     def _invoke_mapper(self, keys: list, fields_: list, criteria: ff.BinaryOp):
         data = self._message_transport.request(

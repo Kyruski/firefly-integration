@@ -4,10 +4,13 @@ from io import StringIO
 from dataclasses import fields
 from pprint import pprint
 from typing import Type
+import firefly_di as di
 
 import firefly as ff
 import pandas as pd
 from moz_sql_parser import parse
+
+from firefly_integration.application import Map
 
 OPS = {
     'eq': '==', 'ne': '!=', 'lt': '<', 'gt': '>', 'lte': '<=', 'gte': '>=', 'is': 'is'
@@ -25,8 +28,9 @@ class MapReduce(ff.DomainService):
     _message_factory: ff.MessageFactory = None
     _non_partition_keys: list = []
     _context: str = None
+    _container: di.Container = None
 
-    def __call__(self, path: str, sql: str, entity: Type[ff.Entity], partitions: list = None):
+    def __call__(self, path: str, sql: str, entity: Type[ff.Entity], types: dict, partitions: list = None):
         self._non_partition_keys = []
         query = parse(sql)
         fields_ = query['select']
@@ -42,7 +46,9 @@ class MapReduce(ff.DomainService):
 
         without_partitions = criteria.prune(self._get_all_criteria_attributes(partitions, criteria))
         chunks = [keys[x:x+6] for x in range(0, len(keys), 6)]
-        results = self._batch_process(self._invoke_mapper, [(chunk, fields_, without_partitions) for chunk in chunks])
+        results = self._batch_process(
+            self._invoke_mapper, [(chunk, fields_, without_partitions, types) for chunk in chunks]
+        )
 
         ret = pd.concat(results)
 
@@ -53,11 +59,24 @@ class MapReduce(ff.DomainService):
 
         return ret
 
-    def _invoke_mapper(self, keys: list, fields_: list, criteria: ff.BinaryOp):
-        data = self._message_transport.request(
-            self._message_factory.query(f'{self._context}.Map', criteria, {'keys': keys, 'fields': fields_})
+    def _invoke_mapper(self, keys: list, fields_: list, criteria: ff.BinaryOp, types: dict):
+        data = self._container.build(Map)(
+            keys=keys,
+            fields=fields_,
+            criteria=criteria.to_dict(),
+            types=types
         )
-        return pd.read_csv(StringIO(data))
+        # data = self._message_transport.request(
+        #     self._message_factory.query(f'{self._context}.Map', criteria, {
+        #         'keys': keys,
+        #         'fields': fields_,
+        #         'types': types,
+        #     })
+        # )
+        ret = pd.read_json(StringIO(data), dtype=types)
+        # ret.set_index(['id'], inplace=True)
+
+        return ret
 
     def _list_partition(self, path: str):
         return self._file_system.list(path)

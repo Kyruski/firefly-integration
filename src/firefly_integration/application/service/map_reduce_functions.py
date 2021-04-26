@@ -13,12 +13,15 @@ class Map(ff.ApplicationService):
     _context: str = None
     _df: pd.DataFrame = None
 
-    def __call__(self, keys: list, fields: list, criteria: dict):
+    def __call__(self, keys: list, fields: list, criteria: dict, types: dict):
         criteria = ff.BinaryOp.from_dict(criteria)
-        results = self._batch_process(self._read, [(key[0], fields, criteria) for key in keys])
+        results = self._batch_process(self._read, [(key[0], fields, criteria, types) for key in keys])
 
-        return pd.concat(results).to_csv()
+        return pd.concat(results).to_json()
 
-    def _read(self, key: str, fields: list, criteria: ff.BinaryOp):
+    def _read(self, key: str, fields: list, criteria: ff.BinaryOp, types: dict):
         data = self._file_system.filter(key, fields, criteria)
-        return pd.read_json(StringIO(data))
+        ret = pd.read_json(StringIO(data), dtype=types)
+        # ret.set_index(['id'], inplace=True)
+
+        return ret

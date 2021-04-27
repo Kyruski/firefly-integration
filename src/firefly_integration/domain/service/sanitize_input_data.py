@@ -26,6 +26,11 @@ class SanitizeInputData(ff.DomainService):
             else:
                 df[column.name] = df[column.name].astype(column.data_type)
 
+        columns = list(map(lambda cc: cc.name, table.columns))
+        for c in df.columns:
+            if c not in columns:
+                del df[c]
+
         df.replace({np.nan: None}, inplace=True)
 
         return df

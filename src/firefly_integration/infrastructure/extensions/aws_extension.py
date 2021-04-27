@@ -48,6 +48,9 @@ class AddGlueDataCatalog(ff.AgentExtension):
             TableInput=TableInput(
                 Description=table.description or '',
                 Name=table.name,
+                Parameters={
+                    'projection.enabled': False,
+                },
                 PartitionKeys=[
                     Column(Comment=part.comment or '', Name=part.name, Type=self._athena_type(part.data_type))
                     for part in table.partitions

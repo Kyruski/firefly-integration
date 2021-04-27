@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, date
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Union
+
 import inflection
+import pandas as pd
 
 import firefly_integration.domain as domain
 
@@ -13,14 +16,18 @@ class Table:
     description: str = None
     columns: List[domain.Column] = []
     partitions: List[domain.Column] = []
-    _partition_generators: Dict[str, Callable] = None
     duplicate_fields: List[str] = []
     duplicate_sort: List[str] = []
     database: domain.Database = None
+    date_grouping: dict = None  # ???
+    time_partitioning: str = None
+    file_name: Callable = None
+    _partition_generators: Dict[str, Callable] = None
 
     def __init__(self, name: str, columns: List[domain.Column], partitions: List[domain.Column] = None, path: str = '',
                  description: str = None, duplicate_fields: List[str] = None, duplicate_sort: List[str] = None,
-                 partition_generators: Dict[str, Callable] = None):
+                 partition_generators: Dict[str, Callable] = None, date_grouping: dict = None,
+                 file_name: Callable = None, time_partitioning: str = None):
         self.name = inflection.tableize(name)
         self.path = path
         self.columns = columns
@@ -29,6 +36,9 @@ class Table:
         self.duplicate_fields = duplicate_fields or ['id']
         self.duplicate_sort = duplicate_sort or []
         self._partition_generators = partition_generators
+        self.date_grouping = date_grouping
+        self.file_name = file_name
+        self.time_partitioning = time_partitioning
 
         for column in self.columns:
             column.table = self
@@ -39,7 +49,7 @@ class Table:
                 return column
         raise domain.ColumnNotFound(name)
 
-    def generate_partition_path(self, data: dict):
+    def generate_partition_path(self, data: pd.DataFrame):
         parts = []
         for partition in self.partitions:
             if self._partition_generators is not None and partition.name in self._partition_generators:
@@ -56,6 +66,24 @@ class Table:
         ret = {}
         for column in self.columns:
             ret[column.name] = self._pandas_type(column.data_type)
+        return ret
+
+    @property
+    def partition_columns(self):
+        return list(map(lambda c: c.name, self.partitions))
+
+    def full_path(self, df: pd.DataFrame = None):
+        ret = f'{self.database.path}/{self.path or ""}'.rstrip('/')
+        ret = f'{ret}/{self.name}'
+        if df is not None:
+            ret = f'{ret}/{self.generate_partition_path(df)}'
+            if self.file_name:
+                ret = f'{ret}/{self.file_name(df)}'
+            else:
+                ret = f'{ret}/{str(uuid.uuid4())}'
+        if df is not None:
+            ret = f'{ret}.snappy.parquet'
+
         return ret
 
     def _pandas_type(self, t: type):

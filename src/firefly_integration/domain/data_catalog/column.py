@@ -36,3 +36,11 @@ class Column:
     def set_type(self, df: pd.DataFrame):
         df[self.name].astype(str(self.data_type), inplace=True)
         return df
+
+    @property
+    def pandas_type(self):
+        if self.data_type is int:
+            return 'Int64'
+        else:
+            return self.data_type
+

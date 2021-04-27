@@ -24,7 +24,7 @@ class SanitizeInputData(ff.DomainService):
             if column.data_type in (date, datetime):
                 df[column.name] = pd.to_datetime(df[column.name])
             else:
-                df[column.name] = df[column.name].astype(column.data_type)
+                df[column.name] = df[column.name].astype(column.pandas_type)
 
         columns = list(map(lambda cc: cc.name, table.columns))
         for c in df.columns:

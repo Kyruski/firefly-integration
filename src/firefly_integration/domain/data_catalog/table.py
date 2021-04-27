@@ -90,9 +90,9 @@ class Table:
         if t is str:
             return 'string'
         if t is int:
-            return 'integer'
+            return 'bigint'
         if t is float:
-            return 'float'
+            return 'double'
         if t is bool:
             return 'boolean'
         if t is datetime:

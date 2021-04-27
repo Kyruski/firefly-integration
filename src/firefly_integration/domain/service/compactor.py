@@ -1,49 +1,62 @@
 from __future__ import annotations
 
-import bz2
-import gzip
 from abc import ABC
-from io import StringIO
-from typing import Callable
-
-import pandas as pd
 
 import firefly as ff
 
-JSON = 'json'
-CSV = 'csv'
-PARQUET = 'parquet'
-FILE_TYPES = (JSON, CSV, PARQUET)
+import firefly_integration.domain as domain
+import awswrangler as wr
 
-BZIP2 = 'bzip2'
-GZIP = 'gzip'
-COMPRESSION_TYPES = (BZIP2, GZIP)
+MAX_FILE_SIZE = 1000000000  # ~1GB
 
 
-class Compactor(ABC):
-    def __init__(self, input_format: str, output_format: str, input_compression: str = None,
-                 output_compression: str = None):
-        assert input_format in FILE_TYPES
-        assert output_format in FILE_TYPES
-        assert input_compression in COMPRESSION_TYPES
-        assert output_compression in COMPRESSION_TYPES
+class Compactor(ff.ApplicationService, ABC):
+    _context: str = None
 
-        self._input_format = input_format
-        self._output_format = output_format
-        self._input_compression = input_compression
-        self._output_compression = output_compression
+    def __init__(self, table: domain.Table):
+        self._table = table
 
     def __call__(self, *args, **kwargs):
-        pass
+        partitions = wr.catalog.get_parquet_partitions(database=self._table.database.name, table=self._table.name)
 
-    def _decompress_bzip2(self, data, next_: Callable):
-        return next_(bz2.decompress(data))
+        for partition, values in partitions:
+            self.invoke(f'{self._context}.CompactPath', {
+                'path': partition,
+                'type_dict': self._table.type_dict,
+                'sort_fields': self._table.duplicate_sort,
+                'unique_fields': self._table.duplicate_fields,
+            })
 
-    def _decompress_gzip(self, data, next_: Callable):
-        return next_(gzip.decompress(data))
+        print(partitions)
 
-    def _parse_json(self, data, next_: Callable):
-        return next_(pd.read_json(StringIO(data)))
 
-    def _parse_csv(self, data, next_: Callable):
-        return next_(pd.read_csv(StringIO(data)))
+class CompactPath(ff.DomainService):
+    _remove_duplicates: domain.RemoveDuplicates = None
+
+    def __call__(self, path: str, type_dict: dict, sort_fields: list, unique_fields: list):
+        ignore = []
+        to_delete = []
+        key = None
+        n = 0
+        for k, size in wr.s3.size_objects(path=path, use_threads=True).items():
+            if k.endswith('.dat.snappy.parquet'):
+                if size >= MAX_FILE_SIZE:
+                    ignore.append(f'{k.split("/")[-1]}')
+                else:
+                    key = k
+                n += 1
+            else:
+                to_delete.append(k)
+
+        if key is None:
+            key = f'{path}/__{n + 1}.dat.snappy.parquet'
+
+        print(f'Key: {key}')
+
+        df = wr.s3.read_parquet(path=path, path_ignore_suffix=ignore, use_threads=True)
+        print(df)
+        self._remove_duplicates(df, sort_fields, unique_fields)
+        print(df)
+        wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=type_dict, use_threads=True)
+        print(f'Delete: {to_delete}')
+        # wr.s3.delete_objects(to_delete, use_threads=True)

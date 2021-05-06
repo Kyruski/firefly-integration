@@ -43,6 +43,7 @@ setuptools.setup(
         'firefly-framework>=1.1.53',
         'awswrangler>=2.7.0',
         'moz-sql-parser>=4.21',
+        'graphviz>=0.16',
     ],
     classifiers=[
         "Programming Language :: Python :: 3.7",

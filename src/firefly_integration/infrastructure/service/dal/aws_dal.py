@@ -17,11 +17,12 @@ class AwsDal(Dal):
     def store(self, df: pd.DataFrame, table: domain.Table):
         self._ensure_db_created(table)
 
-        try:
-            table.get_column('created_on')
-            df['created_on'] = datetime.now()
-        except domain.ColumnNotFound:
-            pass
+        df = df[list(map(lambda c: c.name, table.columns))]
+
+        if 'created_on' in table.type_dict:
+            df['created_on'].fillna(datetime.now(), inplace=True)
+        if 'updated_on' in table.type_dict:
+            df['updated_on'] = datetime.now()
 
         params = {
             'df': df,
@@ -31,7 +32,8 @@ class AwsDal(Dal):
             'table': table.name,
             'partition_cols': table.partition_columns,
             'compression': 'snappy',
-            'dtype': table.type_dict
+            'dtype': table.type_dict,
+            'schema_evolution': True,
         }
 
         if table.time_partitioning is not None:
@@ -43,11 +45,9 @@ class AwsDal(Dal):
             elif table.time_partitioning == 'month':
                 params['projection_types'] = {'year': 'integer', 'month': 'integer'}
                 params['projection_ranges'] = {'year': f'2000,2100', 'month': '1,12'}
-                params['projection_digits'] = {'month': 2}
             elif table.time_partitioning == 'day':
                 params['projection_types'] = {'year': 'integer', 'month': 'integer', 'day': 'integer'}
                 params['projection_ranges'] = {'year': f'2000,2100', 'month': '1,12', 'day': '1,31'}
-                params['projection_digits'] = {'month': 2, 'day': 2}
 
         wr.s3.to_parquet(**params)
 

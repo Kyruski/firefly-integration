@@ -4,12 +4,12 @@ import multiprocessing
 import uuid
 
 import firefly as ff
-import firefly_integration.domain as domain
-import awswrangler as wr
 import pandas as pd
 
+import firefly_integration.domain as domain
 
-class Query(ff.DomainService):
+
+class QueryWarehouse(ff.DomainService):
     _catalog_registry: domain.CatalogRegistry = None
     _sql_parser: domain.SqlParser = None
     _batch_process: ff.BatchProcess = None
@@ -19,7 +19,7 @@ class Query(ff.DomainService):
 
     def __init__(self):
         self._cpu_count = multiprocessing.cpu_count()
-        self._threshold = self._cpu_count * 2
+        self._threshold = self._cpu_count
 
     def __call__(self, sql: str):
         self._sql_parser.parse(sql)

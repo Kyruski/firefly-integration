@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import List
 
 import firefly as ff
 import pandas as pd
@@ -21,3 +22,18 @@ class Dal(ABC):
     def delete(self, criteria: ff.BinaryOp, table: Table):
         pass
 
+    @abstractmethod
+    def get_partitions(self, table: Table, criteria: ff.BinaryOp = None) -> List[str]:
+        pass
+
+    @abstractmethod
+    def wait_for_tmp_files(self, files: list):
+        pass
+
+    @abstractmethod
+    def read_tmp_files(self, files: list) -> pd.DataFrame:
+        pass
+
+    @abstractmethod
+    def write_tmp_file(self, file: str, data: pd.DataFrame):
+        pass

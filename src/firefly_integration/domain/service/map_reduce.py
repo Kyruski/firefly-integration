@@ -30,7 +30,7 @@ class MapReduce(ff.DomainService):
     _context: str = None
     _container: di.Container = None
 
-    def __call__(self, path: str, ):
+    def __call__(self, path: str, sql: str, entity: Type[ff.Entity], types: dict, partitions: list = None):
         self._non_partition_keys = []
         query = parse(sql)
         fields_ = query['select']

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import List
 
 import awswrangler as wr
 import firefly as ff
@@ -13,6 +14,7 @@ from firefly_integration.domain.service.dal import Dal
 class AwsDal(Dal):
     _batch_process: ff.BatchProcess = None
     _db_created: dict = {}
+    _bucket: str = None
 
     def store(self, df: pd.DataFrame, table: domain.Table):
         self._ensure_db_created(table)
@@ -56,6 +58,28 @@ class AwsDal(Dal):
 
     def delete(self, criteria: ff.BinaryOp, table: domain.Table):
         pass
+
+    def get_partitions(self, table: domain.Table, criteria: ff.BinaryOp = None) -> List[str]:
+        args = {'database': table.database.name, 'table': table.name}
+        if criteria is not None:
+            args['expression'] = str(criteria)
+        partitions = wr.catalog.get_parquet_partitions(**args)
+
+        return list(map(lambda p: p.replace('s3://', ''), partitions.keys()))
+
+    def wait_for_tmp_files(self, files: list):
+        wr.s3.wait_objects_exist(
+            list(map(lambda f: f's3://{self._bucket}/{f}', files)),
+            delay=1,
+            max_attempts=60,
+            use_threads=True
+        )
+
+    def read_tmp_files(self, files: list) -> pd.DataFrame:
+        return wr.s3.read_parquet(list(map(lambda f: f's3://{self._bucket}/{f}', files)), use_threads=True)
+
+    def write_tmp_file(self, file: str, data: pd.DataFrame):
+        wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
     def _ensure_db_created(self, table: domain.Table):
         if table.database.name not in self._db_created:

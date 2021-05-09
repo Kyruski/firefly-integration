@@ -14,11 +14,9 @@ class FilterParquet(ff.ApplicationService):
     _batch_process: ff.BatchProcess = None
     _dal: domain.Dal = None
 
-    def __call__(self, files: list, fields: list, criteria: ff.BinaryOp, result_file: str, table_name: str, **kwargs):
-        # results = self._batch_process(self._do_filter, [(file, fields, criteria) for file in files])
-        results = []
-        for file in files:
-            results.append(self._do_filter(file, fields, criteria))
+    def __call__(self, files: list, fields: list, criteria: dict, result_file: str, table_name: str, **kwargs):
+        criteria = ff.BinaryOp.from_dict(criteria)
+        results = self._batch_process(self._do_filter, [(file, fields, criteria) for file in files])
         df = pd.concat(results)
         table = self._catalog_registry.get_table(table_name)
         df = self._sanitize_input_data(df, table)

@@ -98,7 +98,7 @@ class AwsDal(Dal):
             to_delete = []
             key = None
             n = 0
-            for k, size in wr.s3.size_objects(path=path, use_threads=True).items():
+            for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
                 if k.endswith('.dat.snappy.parquet'):
                     if size >= MAX_FILE_SIZE:
                         ignore.append(f'{k.split("/")[-1]}')

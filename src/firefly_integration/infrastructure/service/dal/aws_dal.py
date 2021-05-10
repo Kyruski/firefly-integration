@@ -89,6 +89,7 @@ class AwsDal(Dal):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
     def compact(self, table: domain.Table, path: str):
+        path = path.rstrip('/')
         with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')))):
             if not path.startswith('s3://'):
                 path = f's3://{path}'

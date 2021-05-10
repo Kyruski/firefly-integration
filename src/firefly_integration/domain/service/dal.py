@@ -37,3 +37,7 @@ class Dal(ABC):
     @abstractmethod
     def write_tmp_file(self, file: str, data: pd.DataFrame):
         pass
+
+    @abstractmethod
+    def compact(self, table: Table, path: str):
+        pass

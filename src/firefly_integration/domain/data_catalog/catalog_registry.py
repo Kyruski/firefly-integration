@@ -12,6 +12,15 @@ class CatalogRegistry(ff.DomainService):
     def add_catalog(self, catalog: domain.Catalog):
         self._catalogs.append(catalog)
 
+    def get_all_tables(self) -> List[domain.Table]:
+        ret = []
+        for catalog in self._catalogs:
+            for database in catalog.databases:
+                for table in database.tables:
+                    ret.append(table)
+
+        return ret
+
     def get_table(self, table_name: str) -> Optional[domain.Table]:
         for catalog in self._catalogs:
             for database in catalog.databases:

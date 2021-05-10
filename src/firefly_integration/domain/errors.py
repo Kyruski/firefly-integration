@@ -6,6 +6,10 @@ class InvalidDataType(IntegrationError):
     pass
 
 
+class TableNotFound(IntegrationError):
+    pass
+
+
 class ColumnNotFound(IntegrationError):
     pass
 

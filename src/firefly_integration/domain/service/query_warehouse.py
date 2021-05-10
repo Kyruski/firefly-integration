@@ -14,6 +14,7 @@ class QueryWarehouse(ff.DomainService):
     _sql_parser: domain.SqlParser = None
     _batch_process: ff.BatchProcess = None
     _filter_parquet: FilterParquet = None
+    _remove_duplicates: domain.RemoveDuplicates = None
     _dal: domain.Dal = None
     _file_system: ff.FileSystem = None
 
@@ -37,7 +38,7 @@ class QueryWarehouse(ff.DomainService):
         else:
             results = self._fan_out(files, fields, select_criteria, table)
 
-        self._deduplicate(results, table)
+        self._remove_duplicates(results, table)
         self._sort(results)
 
         return results
@@ -77,11 +78,6 @@ class QueryWarehouse(ff.DomainService):
         self._dal.wait_for_tmp_files(files)
 
         return self._dal.read_tmp_files(files)
-
-    def _deduplicate(self, data: pd.DataFrame, table: domain.Table):
-        data.sort_values(table.duplicate_sort, inplace=True)
-        data.drop_duplicates(subset=table.duplicate_fields, keep='last', inplace=True)
-        data.set_index(['id'], inplace=True)
 
     def _sort(self, data: pd.DataFrame):
         fields, ascending = self._sql_parser.get_sort_order()

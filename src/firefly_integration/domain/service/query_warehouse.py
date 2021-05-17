@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import multiprocessing
 import uuid
+from typing import Optional
 
 import firefly as ff
 import pandas as pd
@@ -22,11 +23,13 @@ class QueryWarehouse(ff.DomainService):
         self._cpu_count = multiprocessing.cpu_count()
         self._threshold = self._cpu_count
 
-    def __call__(self, sql: str):
+    def __call__(self, sql: str) -> Optional[pd.DataFrame]:
         self._sql_parser.parse(sql)
         table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
         partition_criteria, select_criteria = self._process_criteria(table)
         paths = self._dal.get_partitions(table, partition_criteria)
+        if len(paths) == 0:
+            return None
 
         files = self._batch_process(self._list_files, [(path,) for path in paths])
         files = [item for sb in files for item in sb]
@@ -81,7 +84,8 @@ class QueryWarehouse(ff.DomainService):
 
     def _sort(self, data: pd.DataFrame):
         fields, ascending = self._sql_parser.get_sort_order()
-        data.sort_values(by=fields, ascending=ascending, inplace=True)
+        if len(list(map(lambda x: x not in data, fields))) == 0:
+            data.sort_values(by=fields, ascending=ascending, inplace=True)
 
 
 class FilterParquet(ff.DomainService):

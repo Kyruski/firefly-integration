@@ -21,13 +21,14 @@ class Table:
     database: domain.Database = None
     date_grouping: dict = None  # ???
     time_partitioning: str = None
+    time_partitioning_column: str = None
     file_name: Callable = None
     _partition_generators: Dict[str, Callable] = None
 
     def __init__(self, name: str, columns: List[domain.Column], partitions: List[domain.Column] = None, path: str = '',
                  description: str = None, duplicate_fields: List[str] = None, duplicate_sort: List[str] = None,
                  partition_generators: Dict[str, Callable] = None, date_grouping: dict = None,
-                 file_name: Callable = None, time_partitioning: str = None):
+                 file_name: Callable = None, time_partitioning: str = None, time_partitioning_column: str = None):
         self.name = inflection.tableize(name)
         self.path = path
         self.columns = columns
@@ -39,6 +40,7 @@ class Table:
         self.date_grouping = date_grouping
         self.file_name = file_name
         self.time_partitioning = time_partitioning
+        self.time_partitioning_column = time_partitioning_column
 
         for column in self.columns:
             column.table = self

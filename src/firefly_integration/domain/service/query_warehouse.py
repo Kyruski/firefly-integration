@@ -8,6 +8,7 @@ import firefly as ff
 import pandas as pd
 
 import firefly_integration.domain as domain
+import awswrangler as wr
 
 
 class QueryWarehouse(ff.DomainService):
@@ -18,33 +19,49 @@ class QueryWarehouse(ff.DomainService):
     _remove_duplicates: domain.RemoveDuplicates = None
     _dal: domain.Dal = None
     _file_system: ff.FileSystem = None
+    _ff_environment: str = None
 
     def __init__(self):
         self._cpu_count = multiprocessing.cpu_count()
         self._threshold = self._cpu_count
 
     def __call__(self, sql: str) -> Optional[pd.DataFrame]:
+        # This is temporary code to get warehouse queries working. This uses athena. We either need to move this
+        # code, specifically the aws wrangler part, to an infrastructure class or finish the original approach using
+        # lambda.
         self._sql_parser.parse(sql)
         table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
-        partition_criteria, select_criteria = self._process_criteria(table)
-        paths = self._dal.get_partitions(table, partition_criteria)
-        if len(paths) == 0:
-            return None
-
-        files = self._batch_process(self._list_files, [(path,) for path in paths])
-        files = [item for sb in files for item in sb]
-
-        fields = self._sql_parser.get_select_fields()
-        if len(files) <= self._threshold:
-            results = self._batch_process(self._filter_parquet, [(file, fields, select_criteria) for file in files])
-            results = pd.concat(results)
-        else:
-            results = self._fan_out(files, fields, select_criteria, table)
+        results = wr.athena.read_sql_query(
+            sql=sql,
+            database=f'data_warehouse_{self._ff_environment}',
+            ctas_approach=False,
+            use_threads=True
+        )
 
         self._remove_duplicates(results, table)
         self._sort(results)
 
         return results
+
+        # partition_criteria, select_criteria = self._process_criteria(table)
+        # paths = self._dal.get_partitions(table, partition_criteria)
+        # if len(paths) == 0:
+        #     return None
+        #
+        # files = self._batch_process(self._list_files, [(path,) for path in paths])
+        # files = [item for sb in files for item in sb]
+        #
+        # fields = self._sql_parser.get_select_fields()
+        # if len(files) <= self._threshold:
+        #     results = self._batch_process(self._filter_parquet, [(file, fields, select_criteria) for file in files])
+        #     results = pd.concat(results)
+        # else:
+        #     results = self._fan_out(files, fields, select_criteria, table)
+        #
+        # self._remove_duplicates(results, table)
+        # self._sort(results)
+        #
+        # return results
 
     def _fan_out(self, files: list, fields: list, select_criteria: ff.BinaryOp, table: domain.Table):
         output_path = f'tmp/ff-query-results/{str(uuid.uuid4())}'

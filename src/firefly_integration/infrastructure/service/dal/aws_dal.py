@@ -7,6 +7,7 @@ from typing import List
 import awswrangler as wr
 import firefly as ff
 import pandas as pd
+from botocore.exceptions import ClientError
 
 import firefly_integration.domain as domain
 from firefly_integration.domain.service.dal import Dal
@@ -70,7 +71,11 @@ class AwsDal(Dal):
         args = {'database': table.database.name, 'table': table.name}
         if criteria is not None:
             args['expression'] = str(criteria)
-        partitions = wr.catalog.get_parquet_partitions(**args)
+
+        try:
+            partitions = wr.catalog.get_parquet_partitions(**args)
+        except ClientError:
+            return []
 
         return list(map(lambda p: p.replace('s3://', ''), partitions.keys()))
 

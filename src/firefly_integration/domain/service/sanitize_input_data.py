@@ -23,7 +23,7 @@ class SanitizeInputData(ff.DomainService):
                     df[column.name] = column.default
                 elif column.required:
                     raise domain.InvalidInputData()
-                else:
+                elif df.index.name != column.name:
                     df[column.name] = None
             if column.data_type in (date, datetime):
                 if df[column.name].dtype == 'object':
@@ -32,7 +32,7 @@ class SanitizeInputData(ff.DomainService):
                     except ValueError:
                         pass
                 df[column.name] = pd.to_datetime(df[column.name])
-            else:
+            elif df.index.name != column.name:
                 df[column.name] = df[column.name].astype(column.pandas_type)
 
         columns = list(map(lambda cc: cc.name, table.columns))

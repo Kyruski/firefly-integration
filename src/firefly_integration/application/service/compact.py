@@ -21,10 +21,16 @@ class Compact(ff.ApplicationService):
         # Run compaction on all partitions for the given table
         elif path is None:
             table = self._catalog_registry.get_table(table_name)
-            for partition in self._dal.get_partitions(table):
+            if table.partitions is not None:
+                for partition in self._dal.get_partitions(table):
+                    self.invoke(f'{self._context}.Compact', {
+                        'table_name': table.name,
+                        'path': partition,
+                    }, async_=True)
+            else:
                 self.invoke(f'{self._context}.Compact', {
                     'table_name': table.name,
-                    'path': partition,
+                    'path': table.full_path(),
                 }, async_=True)
 
         # Run compaction on single partition

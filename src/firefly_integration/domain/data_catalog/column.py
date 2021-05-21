@@ -16,12 +16,14 @@ class NoDefault:
 class Column:
     name: str = None
     data_type: type = None
-    comment: str = None
+    description: str = None
     required: bool = False
     default = NoDefault
+    meta: dict = {}
     table: domain.Table = None
 
-    def __init__(self, name: str, data_type: type, comment: str = None, required: bool = False, default=NoDefault):
+    def __init__(self, name: str, data_type: type, description: str = None, required: bool = False, default=NoDefault,
+                 meta: dict = None):
         if data_type not in ALLOWED_TYPES:
             raise domain.InvalidDataType(
                 f'Data type {data_type} is not valid for {name}. Allowed types are: {ALLOWED_TYPES}'
@@ -29,9 +31,10 @@ class Column:
 
         self.name = name
         self.data_type = data_type
-        self.comment = comment
+        self.description = description
         self.required = required
         self.default = default
+        self.meta = meta or {}
 
     def set_type(self, df: pd.DataFrame):
         df[self.name].astype(str(self.data_type), inplace=True)

@@ -49,15 +49,18 @@ class AwsDal(Dal):
         if table.time_partitioning is not None:
             params['projection_enabled'] = True
             params['regular_partitions'] = True
+
+            pc = table.time_partitioning_column
+            params['projection_types'] = {pc: 'date'}
+            params['projection_ranges'] = {pc: f'NOW-20YEARS,NOW+50YEARS'}
+            params['projection_intervals'] = {pc: 1}
+
             if table.time_partitioning == 'year':
-                params['projection_types'] = {'year': 'integer'}
-                params['projection_ranges'] = {'year': f'2000,2100'}
+                params['projection_units'] = {pc: 'YEARS'}
             elif table.time_partitioning == 'month':
-                params['projection_types'] = {'year': 'integer', 'month': 'integer'}
-                params['projection_ranges'] = {'year': f'2000,2100', 'month': '1,12'}
+                params['projection_units'] = {pc: 'MONTHS'}
             elif table.time_partitioning == 'day':
-                params['projection_types'] = {'year': 'integer', 'month': 'integer', 'day': 'integer'}
-                params['projection_ranges'] = {'year': f'2000,2100', 'month': '1,12', 'day': '1,31'}
+                params['projection_units'] = {pc: 'DAYS'}
 
         wr.s3.to_parquet(**params)
 

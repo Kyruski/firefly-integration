@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+from collections import OrderedDict
+from datetime import datetime, timedelta
 from hashlib import md5
 from typing import List
 
@@ -52,17 +53,23 @@ class AwsDal(Dal):
 
             pc = table.time_partitioning_column
             params['projection_types'] = {pc: 'date'}
-            params['projection_ranges'] = {pc: f'NOW-20YEARS,NOW+50YEARS'}
             params['projection_intervals'] = {pc: 1}
-
-            if table.time_partitioning == 'year':
-                params['projection_units'] = {pc: 'YEARS'}
-            elif table.time_partitioning == 'month':
-                params['projection_units'] = {pc: 'MONTHS'}
-            elif table.time_partitioning == 'day':
-                params['projection_units'] = {pc: 'DAYS'}
+            params['projection_ranges'] = {
+                pc: self._date_partition_range(df, table.time_partitioning_column, table.time_partitioning)
+            }
 
         wr.s3.to_parquet(**params)
+
+    def _date_partition_range(self, df: pd.DataFrame, col: str, timeframe: str):
+        start = df[col].min()
+        end = df[col].max()
+        fmt = '%Y'
+        if timeframe == 'month':
+            fmt += '-%m'
+        if timeframe == 'day':
+            fmt += '-%m-%d'
+
+        return ','.join(pd.date_range(start, end, freq='MS').strftime(fmt).to_list())
 
     def load(self, table: domain.Table, criteria: ff.BinaryOp = None) -> pd.DataFrame:
         pass

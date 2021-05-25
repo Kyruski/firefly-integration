@@ -28,7 +28,7 @@ class QueryWarehouse(ff.DomainService):
     def __call__(self, sql: str) -> Optional[pd.DataFrame]:
         # This is temporary code to get warehouse queries working. This uses athena. We either need to move this
         # code, specifically the aws wrangler part, to an infrastructure class or finish the original approach using
-        # lambda.
+        # lambda. Also, the database name is assumed here, and it shouldn't be.
         self._sql_parser.parse(sql)
         table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
         results = wr.athena.read_sql_query(

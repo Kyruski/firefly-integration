@@ -4,6 +4,7 @@ from typing import Tuple, List
 
 import firefly as ff
 from moz_sql_parser import parse
+
 import firefly_integration.domain as domain
 
 OPS = {
@@ -25,7 +26,11 @@ class SqlParser(ff.DomainService):
 
     def get_table(self):
         self._ensure_parse_called()
-        return self._parts['from']
+        if isinstance(self._parts['from'], str):
+            return self._parts['from']
+        for table in self._parts['from']:
+            if 'name' in table and table['name'] == 'x':
+                return table['value']
 
     def get_sort_order(self) -> Tuple[List[str], List[bool]]:
         self._ensure_parse_called()

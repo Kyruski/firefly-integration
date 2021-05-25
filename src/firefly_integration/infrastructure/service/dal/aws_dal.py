@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime
 from hashlib import md5
 from typing import List
 
@@ -48,28 +47,18 @@ class AwsDal(Dal):
         }
 
         if table.time_partitioning is not None:
+            params['partition_cols'] = ['dt']
             params['projection_enabled'] = True
             params['regular_partitions'] = True
+            fmt = '%Y'
+            if table.time_partitioning == 'month':
+                fmt += '-%m'
+            if table.time_partitioning == 'day':
+                fmt += '-%m-%d'
 
-            pc = table.time_partitioning_column
-            params['projection_types'] = {pc: 'date'}
-            params['projection_intervals'] = {pc: 1}
-            params['projection_ranges'] = {
-                pc: self._date_partition_range(df, table.time_partitioning_column, table.time_partitioning)
-            }
+            df['dt'] = pd.to_datetime(df[table.time_partitioning_column]).dt.strftime(fmt)
 
         wr.s3.to_parquet(**params)
-
-    def _date_partition_range(self, df: pd.DataFrame, col: str, timeframe: str):
-        start = df[col].min()
-        end = df[col].max()
-        fmt = '%Y'
-        if timeframe == 'month':
-            fmt += '-%m'
-        if timeframe == 'day':
-            fmt += '-%m-%d'
-
-        return ','.join(pd.date_range(start, end, freq='MS').strftime(fmt).to_list())
 
     def load(self, table: domain.Table, criteria: ff.BinaryOp = None) -> pd.DataFrame:
         pass

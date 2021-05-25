@@ -48,7 +48,7 @@ class AwsDal(Dal):
 
         if table.time_partitioning is not None:
             params['partition_cols'] = ['dt']
-            params['projection_enabled'] = True
+            # params['projection_enabled'] = True
             params['regular_partitions'] = True
             fmt = '%Y'
             if table.time_partitioning == 'month':

@@ -21,7 +21,7 @@ class Compact(ff.ApplicationService):
         # Run compaction on all partitions for the given table
         elif path is None:
             table = self._catalog_registry.get_table(table_name)
-            if len(table.partitions) > 0:
+            if len(table.partitions) > 0 or table.time_partitioning is not None:
                 for partition in self._dal.get_partitions(table):
                     self.invoke(f'{self._context}.Compact', {
                         'table_name': table.name,

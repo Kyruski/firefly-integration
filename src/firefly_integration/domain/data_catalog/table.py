@@ -88,6 +88,18 @@ class Table:
 
         return ret
 
+    @property
+    def time_partition_format(self):
+        ret = None
+        if self.time_partitioning is not None:
+            ret = '%Y'
+            if self.time_partitioning == 'month':
+                ret += '-%m'
+            if self.time_partitioning == 'day':
+                ret += '-%m-%d'
+
+        return ret
+
     def _pandas_type(self, t: type):
         if t is str:
             return 'string'

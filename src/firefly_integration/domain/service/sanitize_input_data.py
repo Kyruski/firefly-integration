@@ -34,7 +34,10 @@ class SanitizeInputData(ff.DomainService):
                 df[column.name] = pd.to_datetime(df[column.name])
             elif df.index.name != column.name:
                 if column.data_type is int or column.data_type == 'int':
-                    df[column.name] = df[column.name].astype(np.float64).astype(np.int64)
+                    try:
+                        df[column.name] = df[column.name].astype(np.float64).astype(np.int64)
+                    except ValueError:
+                        df[column.name] = None
                 else:
                     df[column.name] = df[column.name].astype(column.pandas_type)
 

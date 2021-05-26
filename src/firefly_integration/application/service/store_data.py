@@ -4,6 +4,7 @@ import firefly as ff
 import firefly_integration.domain as ffi
 
 
+@ff.command_handler()
 class StoreData(ff.ApplicationService):
     _catalog_registry: ffi.CatalogRegistry = None
     _store_data: ffi.StoreData = None

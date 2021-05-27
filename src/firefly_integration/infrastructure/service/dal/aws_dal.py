@@ -61,7 +61,8 @@ class AwsDal(Dal):
             # params['projection_types'] = {'dt': 'enum'}
             # params['projection_values'] = {'dt': self._date_partition_range(df, table.time_partitioning)}
 
-        wr.s3.to_parquet(**params)
+        if not df.empty:
+            wr.s3.to_parquet(**params)
 
     def _date_partition_range(self, df: pd.DataFrame, timeframe: str):
         start = df['dt'].min()

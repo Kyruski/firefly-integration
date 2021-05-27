@@ -58,8 +58,8 @@ class AwsDal(Dal):
 
             df['dt'] = pd.to_datetime(df[table.time_partitioning_column]).dt.strftime(fmt)
 
-            params['projection_types'] = {'dt': 'enum'}
-            params['projection_values'] = {'dt': self._date_partition_range(df, table.time_partitioning)}
+            # params['projection_types'] = {'dt': 'enum'}
+            # params['projection_values'] = {'dt': self._date_partition_range(df, table.time_partitioning)}
 
         wr.s3.to_parquet(**params)
 

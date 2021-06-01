@@ -44,6 +44,8 @@ class Column:
     def pandas_type(self):
         if self.data_type is int:
             return 'Int64'
+        elif self.data_type is str:
+            return 'string'
         else:
             return self.data_type
 

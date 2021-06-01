@@ -135,7 +135,10 @@ class AwsDal(Dal):
 
             df = wr.s3.read_parquet(path=path, path_ignore_suffix=ignore, use_threads=True)
             self._remove_duplicates(df, table)
-            df.reset_index(inplace=True)
+            try:
+                df.reset_index(inplace=True)
+            except ValueError:
+                pass
             wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict, use_threads=True)
             wr.s3.delete_objects(to_delete, use_threads=True)
 

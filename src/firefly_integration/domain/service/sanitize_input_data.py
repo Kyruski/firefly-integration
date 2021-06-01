@@ -24,7 +24,7 @@ class SanitizeInputData(ff.DomainService):
                 elif column.required:
                     raise domain.InvalidInputData()
                 elif df.index.name != column.name:
-                    df[column.name] = None
+                    df[column.name] = np.nan
             if column.data_type in (date, datetime):
                 if df[column.name].dtype == 'object':
                     try:
@@ -37,7 +37,7 @@ class SanitizeInputData(ff.DomainService):
                     try:
                         df[column.name] = df[column.name].astype(np.float64).astype(np.int64)
                     except ValueError:
-                        df[column.name] = None
+                        df[column.name] = np.nan
                 else:
                     df[column.name] = df[column.name].astype(column.pandas_type)
 

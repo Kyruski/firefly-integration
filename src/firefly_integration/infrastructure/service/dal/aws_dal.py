@@ -129,7 +129,7 @@ class AwsDal(Dal):
         if len(to_delete) == 0:
             return  # Nothing new to compact
 
-        with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')))):
+        with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
             if key is None:
                 key = f'{path}/{n + 1}.dat.snappy.parquet'
 

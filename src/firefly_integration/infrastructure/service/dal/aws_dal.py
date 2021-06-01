@@ -30,9 +30,9 @@ class AwsDal(Dal):
         df = df[list(map(lambda c: c.name, table.columns))]
 
         if 'created_on' in table.type_dict:
-            df['created_on'].fillna(datetime.now(), inplace=True)
+            df['created_on'].fillna(datetime.utcnow(), inplace=True)
         if 'updated_on' in table.type_dict:
-            df['updated_on'] = datetime.now()
+            df['updated_on'] = datetime.utcnow()
 
         params = {
             'df': df,

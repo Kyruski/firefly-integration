@@ -20,3 +20,7 @@ class InvalidInputData(IntegrationError):
 
 class InvalidPartitionData(IntegrationError):
     pass
+
+
+class WorkflowFunctionError(IntegrationError):
+    pass

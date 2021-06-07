@@ -25,20 +25,20 @@ class ExecuteWorkflow(ff.DomainService):
 
         for batch in workflow.batch():
             for function in batch:
-                try:
-                    data = self._execute_function(function, data)
-                except Exception as e:
-                    raise WorkflowFunctionError(f"""
-Function: {function}
-
-Input:
-
-{data.debug()}
-
-Original Exception:
-
-{str(e)}
-                    """)
+                # try:
+                data = self._execute_function(function, data)
+#                 except Exception as e:
+#                     raise WorkflowFunctionError(f"""
+# Function: {function}
+#
+# Input:
+#
+# {data.debug()}
+#
+# Original Exception:
+#
+# {str(e)}
+#                     """)
         # for batch in workflow.batch():
         #     self._batch_process(self._execute_function, [(x, data) for x in batch])
 

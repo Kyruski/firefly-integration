@@ -44,7 +44,10 @@ class SanitizeInputData(ff.DomainService):
         columns = list(map(lambda cc: cc.name, table.columns))
         for c in df.columns:
             if c not in columns:
-                del df[c]
+                try:
+                    del df[c]
+                except KeyError:
+                    pass
 
         df.replace({np.nan: None}, inplace=True)
 

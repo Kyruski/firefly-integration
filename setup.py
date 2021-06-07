@@ -31,7 +31,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='firefly-integration',
-    version='0.1.0',
+    version='1.0.0',
     author="JD Williams",
     author_email="me@jdwilliams.xyz",
     description="Bounded context for data integration.",
@@ -40,7 +40,7 @@ setuptools.setup(
     packages=setuptools.PEP420PackageFinder.find('src'),
     package_dir={'': 'src'},
     install_requires=[
-        'firefly-framework>=1.1.53',
+        'firefly-framework>=1.1.54',
         'awswrangler>=2.7.0',
         'moz-sql-parser>=4.21',
         'graphviz>=0.16',

@@ -25,12 +25,14 @@ class QueryWarehouse(ff.DomainService):
         self._cpu_count = multiprocessing.cpu_count()
         self._threshold = self._cpu_count
 
-    def __call__(self, sql: str) -> Optional[pd.DataFrame]:
+    def __call__(self, sql: str, table: domain.Table = None) -> Optional[pd.DataFrame]:
         # This is temporary code to get warehouse queries working. This uses athena. We either need to move this
         # code, specifically the aws wrangler part, to an infrastructure class or finish the original approach using
         # lambda. Also, the database name is assumed here, and it shouldn't be.
         self._sql_parser.parse(sql)
-        table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
+        if table is None:
+            table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
+
         results = wr.athena.read_sql_query(
             sql=sql,
             database=f'data_warehouse_{self._ff_environment}',
@@ -38,8 +40,11 @@ class QueryWarehouse(ff.DomainService):
             use_threads=True
         )
 
-        self._remove_duplicates(results, table)
-        self._sort(results)
+        try:
+            self._remove_duplicates(results, table)
+            self._sort(results)
+        except KeyError:
+            pass
 
         return results
 

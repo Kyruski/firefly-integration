@@ -11,7 +11,8 @@ import numpy as np
 
 
 class SanitizeInputData(ff.DomainService):
-    def __call__(self, data: Union[List[dict], dict, pd.DataFrame], table: domain.Table) -> pd.DataFrame:
+    def __call__(self, data: Union[List[dict], dict, pd.DataFrame], table: domain.Table,
+                 validate: bool = True) -> pd.DataFrame:
         if not isinstance(data, pd.DataFrame):
             df = pd.DataFrame(data if isinstance(data, list) else [data])
         else:
@@ -21,7 +22,7 @@ class SanitizeInputData(ff.DomainService):
             if column.name not in df:
                 if column.default is not domain.NoDefault:
                     df[column.name] = column.default
-                elif column.required:
+                elif column.required and validate is True:
                     raise domain.InvalidInputData()
                 elif df.index.name != column.name:
                     df[column.name] = np.nan

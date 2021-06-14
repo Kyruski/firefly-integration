@@ -19,6 +19,7 @@ PARTITION_LOCK = 'partition-lock-{}'
 class AwsDal(Dal):
     _batch_process: ff.BatchProcess = None
     _remove_duplicates: domain.RemoveDuplicates = None
+    _sanitize_input_data: domain.SanitizeInputData = None
     _mutex: ff.Mutex = None
     _db_created: dict = {}
     _context: str = None
@@ -133,7 +134,10 @@ class AwsDal(Dal):
             if key is None:
                 key = f'{path}/{n + 1}.dat.snappy.parquet'
 
-            df = wr.s3.read_parquet(path=path, path_ignore_suffix=ignore, use_threads=True)
+            df = self._sanitize_input_data(
+                wr.s3.read_parquet(path=path, path_ignore_suffix=ignore, use_threads=True),
+                table
+            )
             self._remove_duplicates(df, table)
             try:
                 df.reset_index(inplace=True)

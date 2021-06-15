@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import firefly as ff
+from botocore.exceptions import ClientError
+
 import firefly_integration.domain as domain
 
 
@@ -21,13 +23,16 @@ class Compact(ff.ApplicationService):
         # Run compaction on all partitions for the given table
         elif path is None:
             table = self._catalog_registry.get_table(table_name)
-            if len(table.partitions) > 0 or table.time_partitioning is not None:
-                for partition in self._dal.get_partitions(table):
-                    self.invoke(f'{self._context}.Compact', {
-                        'table_name': table.name,
-                        'path': partition,
-                    }, async_=True)
-            else:
+            if table is not None and len(table.partitions) > 0 or table.time_partitioning is not None:
+                try:
+                    for partition in self._dal.get_partitions(table):
+                        self.invoke(f'{self._context}.Compact', {
+                            'table_name': table.name,
+                            'path': partition,
+                        }, async_=True)
+                except ClientError as e:
+                    self.info(str(e))
+            elif table is not None:
                 self.invoke(f'{self._context}.Compact', {
                     'table_name': table.name,
                     'path': table.full_path(),

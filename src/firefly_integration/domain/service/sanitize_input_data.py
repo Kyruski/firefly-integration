@@ -30,7 +30,7 @@ class SanitizeInputData(ff.DomainService):
                 if df[column.name].dtype == 'object':
                     try:
                         df[column.name] = np.float64(df[column.name])
-                    except ValueError:
+                    except (ValueError, TypeError):
                         pass
                 df[column.name] = pd.to_datetime(df[column.name])
             elif df.index.name != column.name:

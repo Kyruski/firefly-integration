@@ -12,7 +12,7 @@ from botocore.exceptions import ClientError
 import firefly_integration.domain as domain
 from firefly_integration.domain.service.dal import Dal
 
-MAX_FILE_SIZE = 1000000000  # ~1GB
+MAX_FILE_SIZE = 250000000  # ~250MB
 PARTITION_LOCK = 'partition-lock-{}'
 
 
@@ -150,14 +150,14 @@ class AwsDal(Dal):
             if key is None:
                 key = f'{path}/{n + 1}.dat.snappy.parquet'
 
-            df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read), table)
+            df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
             self._remove_duplicates(df, table)
             try:
                 df.reset_index(inplace=True)
             except ValueError:
                 pass
-            wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict)
-            wr.s3.delete_objects(to_delete)
+            wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict, use_threads=True)
+            wr.s3.delete_objects(to_delete, use_threads=True)
 
         return ret
 

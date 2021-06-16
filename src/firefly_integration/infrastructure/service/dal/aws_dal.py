@@ -24,6 +24,12 @@ class AwsDal(Dal):
     _db_created: dict = {}
     _context: str = None
     _bucket: str = None
+    _max_compact_records: str = None
+
+    def __init__(self):
+        super().__init__()
+        if self._max_compact_records is None:
+            self._max_compact_records = '1000'
 
     def store(self, df: pd.DataFrame, table: domain.Table):
         self._ensure_db_created(table)
@@ -127,8 +133,8 @@ class AwsDal(Dal):
         if len(to_delete) == 0:
             return  # Nothing new to compact
 
-        if len(to_delete) > 1000:
-            to_delete = to_delete[:1000]
+        if len(to_delete) > int(self._max_compact_records):
+            to_delete = to_delete[:int(self._max_compact_records)]
         to_read = to_delete.copy()
         if key is not None:
             to_read.append(key)

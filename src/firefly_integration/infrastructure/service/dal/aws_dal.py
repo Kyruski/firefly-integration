@@ -113,15 +113,12 @@ class AwsDal(Dal):
         if not path.startswith('s3://'):
             path = f's3://{path}'
 
-        ignore = []
         to_delete = []
         key = None
         n = 0
         for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
             if k.endswith('.dat.snappy.parquet'):
-                if size >= MAX_FILE_SIZE:
-                    ignore.append(f'{k.split("/")[-1]}')
-                else:
+                if size < MAX_FILE_SIZE:
                     key = k
                 n += 1
             else:
@@ -130,14 +127,17 @@ class AwsDal(Dal):
         if len(to_delete) == 0:
             return  # Nothing new to compact
 
+        if len(to_delete) > 1000:
+            to_delete = to_delete[:1000]
+        to_read = to_delete.copy()
+        if key is not None:
+            to_read.append(key)
+
         with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
             if key is None:
                 key = f'{path}/{n + 1}.dat.snappy.parquet'
 
-            df = self._sanitize_input_data(
-                wr.s3.read_parquet(path=path, path_ignore_suffix=ignore, use_threads=True),
-                table
-            )
+            df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
             self._remove_duplicates(df, table)
             try:
                 df.reset_index(inplace=True)

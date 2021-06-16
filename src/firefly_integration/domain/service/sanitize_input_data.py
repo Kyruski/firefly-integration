@@ -12,7 +12,7 @@ import numpy as np
 
 class SanitizeInputData(ff.DomainService):
     def __call__(self, data: Union[List[dict], dict, pd.DataFrame], table: domain.Table,
-                 validate: bool = True) -> pd.DataFrame:
+                 validate: bool = True, add_missing_columns: bool = True) -> pd.DataFrame:
         if not isinstance(data, pd.DataFrame):
             df = pd.DataFrame(data if isinstance(data, list) else [data])
         else:
@@ -20,6 +20,8 @@ class SanitizeInputData(ff.DomainService):
 
         for column in table.columns:
             if column.name not in df:
+                if not add_missing_columns:
+                    continue
                 if column.default is not domain.NoDefault:
                     df[column.name] = column.default
                 elif column.required and validate is True:

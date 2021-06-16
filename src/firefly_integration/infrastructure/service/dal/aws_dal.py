@@ -115,10 +115,16 @@ class AwsDal(Dal):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
     def compact(self, table: domain.Table, path: str):
+        while True:
+            if self._do_compact(table, path) is True:
+                break
+
+    def _do_compact(self, table: domain.Table, path: str) -> bool:
         path = path.rstrip('/')
         if not path.startswith('s3://'):
             path = f's3://{path}'
 
+        ret = True
         to_delete = []
         key = None
         n = 0
@@ -131,26 +137,29 @@ class AwsDal(Dal):
                 to_delete.append(k)
 
         if len(to_delete) == 0:
-            return  # Nothing new to compact
+            return True  # Nothing new to compact
 
         if len(to_delete) > int(self._max_compact_records):
+            ret = False
             to_delete = to_delete[:int(self._max_compact_records)]
         to_read = to_delete.copy()
         if key is not None:
             to_read.append(key)
 
-        with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
+        with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest()), timeout=0):
             if key is None:
                 key = f'{path}/{n + 1}.dat.snappy.parquet'
 
-            df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
+            df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read), table)
             self._remove_duplicates(df, table)
             try:
                 df.reset_index(inplace=True)
             except ValueError:
                 pass
-            wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict, use_threads=True)
-            wr.s3.delete_objects(to_delete, use_threads=True)
+            wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict)
+            wr.s3.delete_objects(to_delete)
+
+        return ret
 
     def _ensure_db_created(self, table: domain.Table):
         if table.database.name not in self._db_created:

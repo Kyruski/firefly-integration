@@ -31,7 +31,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='firefly-integration',
-    version='1.0.8',
+    version='1.0.9',
     author="JD Williams",
     author_email="me@jdwilliams.xyz",
     description="Bounded context for data integration.",

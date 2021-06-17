@@ -154,7 +154,11 @@ class AwsDal(Dal):
                 if key is None:
                     key = f'{path}/{n + 1}.dat.snappy.parquet'
 
-                df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
+                try:
+                    df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
+                except ClientError:
+                    return True  # Another process must be compacting, so stop running
+
                 self._remove_duplicates(df, table)
                 try:
                     df.reset_index(inplace=True)

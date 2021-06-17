@@ -33,12 +33,12 @@ class QueryWarehouse(ff.DomainService):
         if table is None:
             table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
 
-        results = wr.athena.read_sql_query(
+        results = ff.retry(lambda: wr.athena.read_sql_query(
             sql=sql,
             database=f'data_warehouse_{self._ff_environment}',
             ctas_approach=False,
             use_threads=True
-        )
+        ))
 
         try:
             self._remove_duplicates(results, table)

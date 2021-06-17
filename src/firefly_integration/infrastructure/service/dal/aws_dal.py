@@ -128,13 +128,16 @@ class AwsDal(Dal):
         to_delete = []
         key = None
         n = 0
-        for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
-            if k.endswith('.dat.snappy.parquet'):
-                if size < MAX_FILE_SIZE:
-                    key = k
-                n += 1
-            else:
-                to_delete.append(k)
+        try:
+            for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
+                if k.endswith('.dat.snappy.parquet'):
+                    if size < MAX_FILE_SIZE:
+                        key = k
+                    n += 1
+                else:
+                    to_delete.append(k)
+        except ClientError:
+            return True  # Another process must be compacting, so stop running
 
         if len(to_delete) == 0:
             return True  # Nothing new to compact

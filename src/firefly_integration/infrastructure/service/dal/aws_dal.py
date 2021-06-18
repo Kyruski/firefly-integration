@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from hashlib import md5
-from typing import List
+from typing import List, Tuple
 
 import awswrangler as wr
 import firefly as ff
@@ -16,7 +16,7 @@ MAX_FILE_SIZE = 250000000  # ~250MB
 PARTITION_LOCK = 'partition-lock-{}'
 
 
-class AwsDal(Dal):
+class AwsDal(Dal, ff.LoggerAware):
     _batch_process: ff.BatchProcess = None
     _remove_duplicates: domain.RemoveDuplicates = None
     _sanitize_input_data: domain.SanitizeInputData = None
@@ -124,40 +124,21 @@ class AwsDal(Dal):
         path = path.rstrip('/')
         if not path.startswith('s3://'):
             path = f's3://{path}'
-        bucket = path.split('/')[2]
+        parts = path.split('/')
+        bucket = parts[2]
+        p = '/'.join(parts[3:])
+        key, key_exists = self._find_master_record(bucket, p)
+        to_compact = self._find_files_to_compact(bucket, p)
 
-        ret = True
-        to_delete = []
-        key = None
-        n = 0
-        try:
-            for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
-                if k.endswith('.tmp'):
-                    continue
-                if k.endswith('.dat.snappy.parquet'):
-                    if size < MAX_FILE_SIZE:
-                        key = k
-                    n += 1
-                else:
-                    to_delete.append(k)
-        except ClientError:
-            return True  # Another process must be compacting, so stop running
-
-        if len(to_delete) == 0:
+        if len(to_compact) == 0:
             return True  # Nothing new to compact
 
-        if len(to_delete) > int(self._max_compact_records):
-            ret = False
-            to_delete = to_delete[:int(self._max_compact_records)]
-        to_read = to_delete.copy()
-        if key is not None:
-            to_read.append(key)
+        to_read = to_compact.copy()
+        if key_exists:
+            to_read.append(f's3://{bucket}/{key}')
 
         try:
             with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest()), timeout=0):
-                if key is None:
-                    key = f'{path}/{n + 1}.dat.snappy.parquet'
-
                 try:
                     df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
                 except ClientError:
@@ -169,16 +150,39 @@ class AwsDal(Dal):
                 except ValueError:
                     pass
                 wr.s3.to_parquet(
-                    df=df, path=f'{key}.tmp', compression='snappy', dtype=table.type_dict, use_threads=True
+                    df=df, path=f's3://{bucket}/{key}.tmp', compression='snappy', dtype=table.type_dict,
+                    use_threads=True
                 )
-                k = '/'.join(key.split('/')[3:])
-                self._s3_client.copy_object(Bucket=bucket, CopySource=f'{bucket}/{k}.tmp', Key=k)
-                self._s3_client.delete_object(Bucket=bucket, Key=f'{k}.tmp')
-                wr.s3.delete_objects(to_delete, use_threads=True)
-        except TimeoutError:
-            pass
+                self._s3_client.copy_object(Bucket=bucket, CopySource=f'{bucket}/{key}.tmp', Key=key)
+                self._s3_client.delete_object(Bucket=bucket, Key=f'{key}.tmp')
+                wr.s3.delete_objects(to_compact, use_threads=True)
 
-        return ret
+                self.info(f'Compacted {len(to_compact)} records')
+        except TimeoutError:
+            return True
+
+        return False
+
+    def _find_master_record(self, bucket: str, key: str) -> Tuple[str, bool]:
+        x = 1
+        while True:
+            try:
+                response = self._s3_client.head_object(Bucket=bucket, Key=f'{key}/{x}.dat.snappy.parquet')
+                if int(response['ContentLength']) < MAX_FILE_SIZE:
+                    return f'{key}/{x}.dat.snappy.parquet', True
+            except self._s3_client.exceptions.NoSuchKey:
+                return f'{key}/{x}.dat.snappy.parquet', False
+            x += 1
+
+    def _find_files_to_compact(self, bucket: str, key: str):
+        response = self._s3_client.list_objects_v2(
+            Bucket=bucket,
+            Prefix=f'{key}/',
+            MaxKeys=int(self._max_compact_records)
+        )
+        return list(map(lambda f: f's3://{bucket}/{f["Key"]}',
+            list(filter(lambda f: '.dat.snappy.parquet' not in f['Key'], response['Contents']))
+        ))
 
     def _ensure_db_created(self, table: domain.Table):
         if table.database.name not in self._db_created:

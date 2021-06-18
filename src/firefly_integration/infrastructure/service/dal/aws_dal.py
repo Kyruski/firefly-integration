@@ -20,6 +20,7 @@ class AwsDal(Dal):
     _batch_process: ff.BatchProcess = None
     _remove_duplicates: domain.RemoveDuplicates = None
     _sanitize_input_data: domain.SanitizeInputData = None
+    _s3_client = None
     _mutex: ff.Mutex = None
     _db_created: dict = {}
     _context: str = None
@@ -123,6 +124,7 @@ class AwsDal(Dal):
         path = path.rstrip('/')
         if not path.startswith('s3://'):
             path = f's3://{path}'
+        bucket = path.split('/')[2]
 
         ret = True
         to_delete = []
@@ -130,6 +132,8 @@ class AwsDal(Dal):
         n = 0
         try:
             for k, size in wr.s3.size_objects(path=f'{path}/', use_threads=True).items():
+                if k.endswith('.tmp'):
+                    continue
                 if k.endswith('.dat.snappy.parquet'):
                     if size < MAX_FILE_SIZE:
                         key = k
@@ -164,7 +168,11 @@ class AwsDal(Dal):
                     df.reset_index(inplace=True)
                 except ValueError:
                     pass
-                wr.s3.to_parquet(df=df, path=key, compression='snappy', dtype=table.type_dict, use_threads=True)
+                wr.s3.to_parquet(
+                    df=df, path=f'{key}.tmp', compression='snappy', dtype=table.type_dict, use_threads=True
+                )
+                self._s3_client.copy_object(Bucket=bucket, CopySource=f'{bucket}/{key}.tmp', Key=key)
+                self._s3_client.delete_object(Bucket=bucket, Key=f'{key}.tmp')
                 wr.s3.delete_objects(to_delete, use_threads=True)
         except TimeoutError:
             pass

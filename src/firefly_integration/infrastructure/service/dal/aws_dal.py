@@ -170,7 +170,7 @@ class AwsDal(Dal, ff.LoggerAware):
                 response = self._s3_client.head_object(Bucket=bucket, Key=f'{key}/{x}.dat.snappy.parquet')
                 if int(response['ContentLength']) < MAX_FILE_SIZE:
                     return f'{key}/{x}.dat.snappy.parquet', True
-            except self._s3_client.exceptions.NoSuchKey:
+            except ClientError:
                 return f'{key}/{x}.dat.snappy.parquet', False
             x += 1
 

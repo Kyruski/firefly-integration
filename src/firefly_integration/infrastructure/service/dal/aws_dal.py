@@ -171,8 +171,9 @@ class AwsDal(Dal):
                 wr.s3.to_parquet(
                     df=df, path=f'{key}.tmp', compression='snappy', dtype=table.type_dict, use_threads=True
                 )
-                self._s3_client.copy_object(Bucket=bucket, CopySource=f'{bucket}/{key}.tmp', Key=key)
-                self._s3_client.delete_object(Bucket=bucket, Key=f'{key}.tmp')
+                k = '/'.join(key.split('/')[3:])
+                self._s3_client.copy_object(Bucket=bucket, CopySource=f'{bucket}/{k}.tmp', Key=k)
+                self._s3_client.delete_object(Bucket=bucket, Key=f'{k}.tmp')
                 wr.s3.delete_objects(to_delete, use_threads=True)
         except TimeoutError:
             pass

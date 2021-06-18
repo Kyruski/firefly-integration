@@ -127,8 +127,8 @@ class AwsDal(Dal, ff.LoggerAware):
         parts = path.split('/')
         bucket = parts[2]
         p = '/'.join(parts[3:])
-        key, key_exists = self._find_master_record(bucket, p)
-        to_compact = self._find_files_to_compact(bucket, p)
+        key, key_exists, num_master_records = self._find_master_record(bucket, p)
+        to_compact = self._find_files_to_compact(bucket, p, num_master_records)
 
         if len(to_compact) == 0:
             return True  # Nothing new to compact
@@ -163,22 +163,22 @@ class AwsDal(Dal, ff.LoggerAware):
 
         return False
 
-    def _find_master_record(self, bucket: str, key: str) -> Tuple[str, bool]:
+    def _find_master_record(self, bucket: str, key: str) -> Tuple[str, bool, int]:
         x = 1
         while True:
             try:
                 response = self._s3_client.head_object(Bucket=bucket, Key=f'{key}/{x}.dat.snappy.parquet')
                 if int(response['ContentLength']) < MAX_FILE_SIZE:
-                    return f'{key}/{x}.dat.snappy.parquet', True
+                    return f'{key}/{x}.dat.snappy.parquet', True, x
             except ClientError:
-                return f'{key}/{x}.dat.snappy.parquet', False
+                return f'{key}/{x}.dat.snappy.parquet', False, x
             x += 1
 
-    def _find_files_to_compact(self, bucket: str, key: str):
+    def _find_files_to_compact(self, bucket: str, key: str, num_master_records: int):
         response = self._s3_client.list_objects_v2(
             Bucket=bucket,
             Prefix=f'{key}/',
-            MaxKeys=int(self._max_compact_records)
+            MaxKeys=int(self._max_compact_records) + num_master_records
         )
         return list(map(lambda f: f's3://{bucket}/{f["Key"]}',
             list(filter(lambda f: '.dat.snappy.parquet' not in f['Key'], response['Contents']))

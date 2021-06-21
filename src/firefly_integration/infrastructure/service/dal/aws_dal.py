@@ -12,7 +12,8 @@ from botocore.exceptions import ClientError
 import firefly_integration.domain as domain
 from firefly_integration.domain.service.dal import Dal
 
-MAX_FILE_SIZE = 250000000  # ~250MB
+MAX_FILE_SIZE = 262144000  # 250MB
+MAX_RUN_TIME = 600  # 10 Minutes
 PARTITION_LOCK = 'partition-lock-{}'
 
 
@@ -116,8 +117,12 @@ class AwsDal(Dal, ff.LoggerAware):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
     def compact(self, table: domain.Table, path: str):
+        start = datetime.now()
         while True:
             if self._do_compact(table, path) is True:
+                break
+            if (datetime.now() - start).total_seconds() >= MAX_RUN_TIME:
+                self.info("We've been running for 10 minutes. Stopping now.")
                 break
 
     def _do_compact(self, table: domain.Table, path: str) -> bool:
@@ -127,8 +132,8 @@ class AwsDal(Dal, ff.LoggerAware):
         parts = path.split('/')
         bucket = parts[2]
         p = '/'.join(parts[3:])
-        key, key_exists, num_master_records = self._find_master_record(bucket, p)
-        to_compact = self._find_files_to_compact(bucket, p, num_master_records)
+        key, key_exists, num_master_records, master_record_size = self._find_master_record(bucket, p)
+        to_compact = self._find_files_to_compact(bucket, p, num_master_records, master_record_size)
 
         if len(to_compact) == 0:
             return True  # Nothing new to compact
@@ -163,26 +168,34 @@ class AwsDal(Dal, ff.LoggerAware):
 
         return False
 
-    def _find_master_record(self, bucket: str, key: str) -> Tuple[str, bool, int]:
+    def _find_master_record(self, bucket: str, key: str) -> Tuple[str, bool, int, int]:
         x = 1
         while True:
             try:
                 response = self._s3_client.head_object(Bucket=bucket, Key=f'{key}/{x}.dat.snappy.parquet')
                 if int(response['ContentLength']) < MAX_FILE_SIZE:
-                    return f'{key}/{x}.dat.snappy.parquet', True, x
+                    return f'{key}/{x}.dat.snappy.parquet', True, x, int(response['ContentLength'])
             except ClientError:
-                return f'{key}/{x}.dat.snappy.parquet', False, x
+                return f'{key}/{x}.dat.snappy.parquet', False, x, 0
             x += 1
 
-    def _find_files_to_compact(self, bucket: str, key: str, num_master_records: int):
+    def _find_files_to_compact(self, bucket: str, key: str, num_master_records: int, master_record_size: int):
         response = self._s3_client.list_objects_v2(
             Bucket=bucket,
             Prefix=f'{key}/',
             MaxKeys=int(self._max_compact_records) + num_master_records
         )
-        return list(map(lambda f: f's3://{bucket}/{f["Key"]}',
-            list(filter(lambda f: '.dat.snappy.parquet' not in f['Key'], response['Contents']))
-        ))
+        ret = []
+        total = master_record_size
+        for f in response['Contents']:
+            if '.dat.snappy.parquet' in f['Key']:
+                continue
+            total += f['Size']
+            if total > MAX_FILE_SIZE:
+                break
+            ret.append(f's3://{bucket}/{f["Key"]}')
+
+        return ret
 
     def _ensure_db_created(self, table: domain.Table):
         if table.database.name not in self._db_created:

@@ -116,6 +116,55 @@ class AwsDal(Dal, ff.LoggerAware):
     def write_tmp_file(self, file: str, data: pd.DataFrame):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
+#     def deduplicate_partition(self, table: domain.Table, path: str, dt: str):
+#         path = self._prepare_path(path)
+#         fields: list = table.duplicate_fields.copy() \
+#             if isinstance(table.duplicate_fields, list) else [table.duplicate_fields]
+#         if isinstance(table.duplicate_sort, list):
+#             fields.extend(table.duplicate_sort)
+#         else:
+#             fields.append(table.duplicate_sort)
+#         fields = list(map(lambda f: f'a."{f}"', fields))
+#
+#         inner_clauses = [f' {f} is not null ' for f in table.duplicate_fields]
+#         outer_clauses = [f' a."{f}" = b."{f}" ' for f in table.duplicate_fields]
+#         dt_clause = f"dt = '{dt}' and " if dt is not None else ''
+#
+#         sql = f"""
+# select {','.join(fields)}, a."$path"
+# from {table.name} a
+# join (
+#   select {','.join(table.duplicate_fields)}, count(*)
+#   from {table.name}
+#   where {dt_clause}
+#     "$path" like '%.dat.snappy.parquet'
+#     and {'and'.join(inner_clauses)}
+#   group by {','.join(table.duplicate_fields)}
+#   having count(*) > 1
+# ) b
+# on {'and'.join(outer_clauses)}
+# where {dt_clause}
+#   a."$path" like '%.dat.snappy.parquet'
+# order by {','.join(table.duplicate_fields)}
+#         """
+#
+#         print(sql)
+#         df = wr.athena.read_sql_query(sql=sql, database=table.database.name)
+#         if df.empty:
+#             print('no results')
+#             return
+#
+#         try:
+#             with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
+#                 for _, batch in df.groupby('$path'):
+#                     p = batch.iloc[0]['$path']
+#                     f = wr.s3.read_parquet(path=p)
+#                     f = pd.merge(f, batch, indicator=True, how='outer', left_on='vendor_id', right_on='vendor_id')\
+#                         .query('_merge=="left_only"')\
+#                         .drop('_merge', axis=1)
+#         except TimeoutError:
+#             pass
+
     def compact(self, table: domain.Table, path: str):
         start = datetime.now()
         while True:
@@ -126,9 +175,7 @@ class AwsDal(Dal, ff.LoggerAware):
                 break
 
     def _do_compact(self, table: domain.Table, path: str) -> bool:
-        path = path.rstrip('/')
-        if not path.startswith('s3://'):
-            path = f's3://{path}'
+        path = self._prepare_path(path)
         parts = path.split('/')
         bucket = parts[2]
         p = '/'.join(parts[3:])
@@ -143,6 +190,7 @@ class AwsDal(Dal, ff.LoggerAware):
             to_read.append(f's3://{bucket}/{key}')
 
         try:
+            print(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest()))
             with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest()), timeout=0):
                 try:
                     df = self._sanitize_input_data(wr.s3.read_parquet(path=to_read, use_threads=True), table)
@@ -191,9 +239,9 @@ class AwsDal(Dal, ff.LoggerAware):
             if '.dat.snappy.parquet' in f['Key']:
                 continue
             total += f['Size']
+            ret.append(f's3://{bucket}/{f["Key"]}')
             if total > MAX_FILE_SIZE:
                 break
-            ret.append(f's3://{bucket}/{f["Key"]}')
 
         return ret
 
@@ -202,3 +250,10 @@ class AwsDal(Dal, ff.LoggerAware):
             wr.catalog.create_database(name=table.database.name, exist_ok=True,
                                        description=table.database.description or '')
             self._db_created[table.database.name] = True
+
+    def _prepare_path(self, path: str):
+        path = path.rstrip('/')
+        if not path.startswith('s3://'):
+            path = f's3://{path}'
+
+        return path

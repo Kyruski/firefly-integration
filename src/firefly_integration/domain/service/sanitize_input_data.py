@@ -44,6 +44,9 @@ class SanitizeInputData(ff.DomainService):
                 else:
                     df[column.name] = df[column.name].astype(column.pandas_type)
 
+            if column.data_type in (int, float, 'int', 'float'):
+                df[column.name].replace([np.nan, np.inf, -np.inf], value=None, inplace=True)
+
         columns = list(map(lambda cc: cc.name, table.columns))
         for c in df.columns:
             if c not in columns:

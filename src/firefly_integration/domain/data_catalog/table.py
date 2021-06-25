@@ -34,7 +34,7 @@ class Table:
         self.columns = columns
         self.description = description
         self.partitions = partitions or []
-        self.duplicate_fields = duplicate_fields or ['id']
+        self.duplicate_fields = duplicate_fields
         self.duplicate_sort = duplicate_sort or []
         self._partition_generators = partition_generators
         self.date_grouping = date_grouping

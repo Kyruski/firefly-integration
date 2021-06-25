@@ -41,3 +41,7 @@ class Dal(ABC):
     @abstractmethod
     def compact(self, table: Table, path: str):
         pass
+
+    @abstractmethod
+    def deduplicate_partition(self, table: Table, path: str):
+        pass

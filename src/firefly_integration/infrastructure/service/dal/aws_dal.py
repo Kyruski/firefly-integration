@@ -116,54 +116,81 @@ class AwsDal(Dal, ff.LoggerAware):
     def write_tmp_file(self, file: str, data: pd.DataFrame):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
-#     def deduplicate_partition(self, table: domain.Table, path: str, dt: str):
-#         path = self._prepare_path(path)
-#         fields: list = table.duplicate_fields.copy() \
-#             if isinstance(table.duplicate_fields, list) else [table.duplicate_fields]
-#         if isinstance(table.duplicate_sort, list):
-#             fields.extend(table.duplicate_sort)
-#         else:
-#             fields.append(table.duplicate_sort)
-#         fields = list(map(lambda f: f'a."{f}"', fields))
-#
-#         inner_clauses = [f' {f} is not null ' for f in table.duplicate_fields]
-#         outer_clauses = [f' a."{f}" = b."{f}" ' for f in table.duplicate_fields]
-#         dt_clause = f"dt = '{dt}' and " if dt is not None else ''
-#
-#         sql = f"""
-# select {','.join(fields)}, a."$path"
-# from {table.name} a
-# join (
-#   select {','.join(table.duplicate_fields)}, count(*)
-#   from {table.name}
-#   where {dt_clause}
-#     "$path" like '%.dat.snappy.parquet'
-#     and {'and'.join(inner_clauses)}
-#   group by {','.join(table.duplicate_fields)}
-#   having count(*) > 1
-# ) b
-# on {'and'.join(outer_clauses)}
-# where {dt_clause}
-#   a."$path" like '%.dat.snappy.parquet'
-# order by {','.join(table.duplicate_fields)}
-#         """
-#
-#         print(sql)
-#         df = wr.athena.read_sql_query(sql=sql, database=table.database.name)
-#         if df.empty:
-#             print('no results')
-#             return
-#
-#         try:
-#             with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
-#                 for _, batch in df.groupby('$path'):
-#                     p = batch.iloc[0]['$path']
-#                     f = wr.s3.read_parquet(path=p)
-#                     f = pd.merge(f, batch, indicator=True, how='outer', left_on='vendor_id', right_on='vendor_id')\
-#                         .query('_merge=="left_only"')\
-#                         .drop('_merge', axis=1)
-#         except TimeoutError:
-#             pass
+    def deduplicate_partition(self, table: domain.Table, path: str):
+        path = self._prepare_path(path)
+        dt = None
+        for x in path.split('/'):
+            if x.startswith('dt='):
+                dt = x.split('=')[1]
+                break
+        fields: list = table.duplicate_fields.copy() \
+            if isinstance(table.duplicate_fields, list) else [table.duplicate_fields]
+        if isinstance(table.duplicate_sort, list):
+            fields.extend(table.duplicate_sort)
+        else:
+            fields.append(table.duplicate_sort)
+        fields = list(map(lambda f: f'a."{f}"', fields))
+
+        inner_clauses = [f' {f} is not null ' for f in table.duplicate_fields]
+        outer_clauses = [f' a."{f}" = b."{f}" ' for f in table.duplicate_fields]
+        dt_clause = f"dt = '{dt}' and " if dt is not None else ''
+
+        sql = f"""
+select {','.join(fields)}, a."$path"
+from {table.name} a
+join (
+  select {','.join(table.duplicate_fields)}, count(*)
+  from {table.name}
+  where {dt_clause}
+    "$path" like '%.dat.snappy.parquet'
+    and {'and'.join(inner_clauses)}
+  group by {','.join(table.duplicate_fields)}
+  having count(*) > 1
+) b
+on {'and'.join(outer_clauses)}
+where {dt_clause}
+  a."$path" like '%.dat.snappy.parquet'
+order by {','.join(table.duplicate_fields)}
+        """
+
+        df = wr.athena.read_sql_query(sql=sql, database=table.database.name)
+        if df.empty:
+            return
+
+        df.sort_values(by=table.duplicate_sort, inplace=True)
+        df['duplicate'] = df.duplicated(subset=table.duplicate_fields, keep='last')
+        df = df[df['duplicate']]
+        df['u'] = df['updated_on'].astype('datetime64[s]')
+        join_fields = table.duplicate_fields.copy() \
+            if isinstance(table.duplicate_fields, list) else [table.duplicate_fields]
+        join_fields.append('u')
+
+        try:
+            with self._mutex(PARTITION_LOCK.format(md5(path.encode('utf-8')).hexdigest())):
+                start = datetime.now()
+                for _, batch in df.groupby('$path'):
+                    if (datetime.now() - start).total_seconds() >= MAX_RUN_TIME:
+                        self.info("We've been running for 10 minutes. Stopping now.")
+                        break
+
+                    p = batch.iloc[0]['$path']
+                    print(f'Filtering {p}')
+                    f = wr.s3.read_parquet(path=p)
+                    f['u'] = f['updated_on'].astype('datetime64[s]')
+                    f = pd.merge(f, batch, indicator=True, how='outer', left_on=join_fields, right_on=join_fields)\
+                        .query('_merge == "left_only"')\
+                        .drop('_merge', axis=1)
+                    wr.s3.to_parquet(
+                        df=f, path=f'{p}.tmp', compression='snappy', dtype=table.type_dict, use_threads=True
+                    )
+                    dir_ = '/'.join(p.split('/')[0:-1]) + '/'
+                    file_ = p.split('/')[-1]
+                    wr.s3.copy_objects(paths=[f'{p}.tmp'], source_path=dir_, target_path=dir_, replace_filenames={
+                        f'{file_}.tmp': file_,
+                    })
+                    wr.s3.delete_objects(path=[f'{p}.tmp'])
+        except TimeoutError:
+            pass
 
     def compact(self, table: domain.Table, path: str):
         start = datetime.now()

@@ -117,6 +117,9 @@ class AwsDal(Dal, ff.LoggerAware):
         wr.s3.to_parquet(data, path=f's3://{self._bucket}/{file}')
 
     def deduplicate_partition(self, table: domain.Table, path: str):
+        if table.duplicate_sort is None or table.duplicate_fields is None:
+            return
+
         path = self._prepare_path(path)
         dt = None
         for x in path.split('/'):

@@ -179,6 +179,9 @@ order by {','.join(table.duplicate_fields)}
                     p = batch.iloc[0]['$path']
                     print(f'Filtering {p}')
                     f = wr.s3.read_parquet(path=p)
+                    if 'updated_on' not in f:
+                        self.info('No updated_on field in record set')
+                        continue
                     f['u'] = f['updated_on'].astype('datetime64[s]')
                     f = pd.merge(f, batch, indicator=True, how='outer', left_on=join_fields, right_on=join_fields)\
                         .query('_merge == "left_only"')\

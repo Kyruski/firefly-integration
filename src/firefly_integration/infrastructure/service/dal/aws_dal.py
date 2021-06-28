@@ -156,7 +156,7 @@ where {dt_clause}
 order by {','.join(table.duplicate_fields)}
         """
 
-        df = wr.athena.read_sql_query(sql=sql, database=table.database.name)
+        df = wr.athena.read_sql_query(sql=sql, database=table.database.name, ctas_approach=False)
         if df.empty:
             return
 

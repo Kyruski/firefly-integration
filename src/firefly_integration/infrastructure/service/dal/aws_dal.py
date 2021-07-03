@@ -268,13 +268,16 @@ order by {','.join(table.duplicate_fields)}
         )
         ret = []
         total = master_record_size
-        for f in response['Contents']:
-            if '.dat.snappy.parquet' in f['Key']:
-                continue
-            total += f['Size']
-            ret.append(f's3://{bucket}/{f["Key"]}')
-            if total > MAX_FILE_SIZE:
-                break
+        try:
+            for f in response['Contents']:
+                if '.dat.snappy.parquet' in f['Key']:
+                    continue
+                total += f['Size']
+                ret.append(f's3://{bucket}/{f["Key"]}')
+                if total > MAX_FILE_SIZE:
+                    break
+        except KeyError:
+            pass
 
         return ret
 

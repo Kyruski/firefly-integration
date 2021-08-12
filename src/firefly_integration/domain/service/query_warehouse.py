@@ -25,13 +25,24 @@ class QueryWarehouse(ff.DomainService):
         self._cpu_count = multiprocessing.cpu_count()
         self._threshold = self._cpu_count
 
-    def __call__(self, sql: str, table: domain.Table = None) -> Optional[pd.DataFrame]:
+    def __call__(self, sql: str, table: domain.Table = None, output_file: str = None,
+                 cache_seconds: int = None) -> Optional[pd.DataFrame]:
         # This is temporary code to get warehouse queries working. This uses athena. We either need to move this
         # code, specifically the aws wrangler part, to an infrastructure class or finish the original approach using
         # lambda. Also, the database name is assumed here, and it shouldn't be.
         self._sql_parser.parse(sql)
         if table is None:
             table: domain.Table = self._catalog_registry.get_table(self._sql_parser.get_table())
+
+        params = {
+            'sql': sql,
+            'database': f'data_warehouse_{self._ff_environment}',
+            'ctas_approach': False,
+            'use_threads': True,
+        }
+
+        if cache_seconds is not None:
+            params['max_cache_seconds'] = cache_seconds
 
         results = ff.retry(lambda: wr.athena.read_sql_query(
             sql=sql,
@@ -46,7 +57,12 @@ class QueryWarehouse(ff.DomainService):
         except KeyError:
             pass
 
-        return results
+        if output_file is not None:
+            if not output_file.startswith('s3://'):
+                output_file = f's3://{output_file}'
+            wr.s3.to_json(df=results, path=output_file, use_threads=True)
+        else:
+            return results
 
         # partition_criteria, select_criteria = self._process_criteria(table)
         # paths = self._dal.get_partitions(table, partition_criteria)

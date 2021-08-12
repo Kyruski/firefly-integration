@@ -39,7 +39,7 @@ class SanitizeInputData(ff.DomainService):
                 if column.data_type is int or column.data_type == 'int':
                     try:
                         df[column.name] = df[column.name].astype(np.float64).astype(np.int64)
-                    except ValueError:
+                    except (ValueError, TypeError):
                         df[column.name] = np.nan
                 else:
                     df[column.name] = df[column.name].astype(column.pandas_type)

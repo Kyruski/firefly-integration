@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import multiprocessing
 import uuid
+from datetime import date, datetime
 from typing import Optional
 
 import firefly as ff
@@ -60,6 +61,9 @@ class QueryWarehouse(ff.DomainService):
         if output_file is not None:
             if not output_file.startswith('s3://'):
                 output_file = f's3://{output_file}'
+            for column in table.columns:
+                if column.data_type in (date, datetime) and column.name in results:
+                    results[column.name] = results[column.name].apply(lambda x: x if x is None else x.isoformat())
             wr.s3.to_json(df=results, path=output_file, use_threads=True)
         else:
             return results

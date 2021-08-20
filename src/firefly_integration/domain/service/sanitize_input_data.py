@@ -34,7 +34,7 @@ class SanitizeInputData(ff.DomainService):
                         df[column.name] = np.float64(df[column.name])
                     except (ValueError, TypeError):
                         pass
-                df[column.name] = pd.to_datetime(df[column.name])
+                df[column.name] = pd.to_datetime(df[column.name]).dt.tz_localize(None)
             elif df.index.name != column.name:
                 if column.data_type is int or column.data_type == 'int':
                     try:

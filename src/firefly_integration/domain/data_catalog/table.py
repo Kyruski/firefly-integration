@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, date
-from typing import List, Dict, Callable, Union
+from typing import List, Dict, Callable
 
-import inflection
 import pandas as pd
 
 import firefly_integration.domain as domain
@@ -29,7 +28,7 @@ class Table:
                  description: str = None, duplicate_fields: List[str] = None, duplicate_sort: List[str] = None,
                  partition_generators: Dict[str, Callable] = None, date_grouping: dict = None,
                  file_name: Callable = None, time_partitioning: str = None, time_partitioning_column: str = None):
-        self.name = inflection.tableize(name)
+        self.name = name
         self.path = path
         self.columns = columns
         self.description = description

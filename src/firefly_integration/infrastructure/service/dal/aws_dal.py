@@ -178,6 +178,7 @@ order by {','.join(table.duplicate_fields)}
             pass
 
     def compact(self, table: domain.Table, path: str):
+        self.info(f"Compacting {path}")
         start = datetime.now()
         while True:
             if self._do_compact(table, path) is True:

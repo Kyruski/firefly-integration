@@ -25,7 +25,7 @@ class SanitizeInputData(ff.DomainService):
                 if column.default is not domain.NoDefault:
                     df[column.name] = column.default
                 elif column.required and validate is True:
-                    raise domain.InvalidInputData()
+                    raise domain.InvalidInputData(column.name)
                 elif df.index.name != column.name:
                     df[column.name] = np.nan
             if column.data_type in (date, datetime):

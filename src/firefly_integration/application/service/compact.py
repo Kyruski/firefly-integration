@@ -30,7 +30,10 @@ class Compact(ff.ApplicationService):
             self._dal.compact(table=table, path=path)
 
     def _scan_partitions(self, table: domain.Table):
-        files = wr.s3.list_objects('s3://' + table.full_path())
+        path = 's3://' + table.full_path()
+        if not path.endswith('/'):
+            path += '/'
+        files = wr.s3.list_objects(path)
         partitions = []
         for file in files:
             if file.endswith('.dat.snappy.parquet'):

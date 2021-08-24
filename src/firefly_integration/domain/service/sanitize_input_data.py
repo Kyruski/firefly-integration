@@ -46,7 +46,7 @@ class SanitizeInputData(ff.DomainService):
 
         columns = list(map(lambda cc: cc.name, table.columns))
         for c in df.columns:
-            if c not in columns:
+            if c not in columns and c not in table.partitions:
                 try:
                     del df[c]
                 except KeyError:

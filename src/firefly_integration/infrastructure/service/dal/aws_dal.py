@@ -35,8 +35,7 @@ class AwsDal(Dal, ff.LoggerAware):
 
     def store(self, df: pd.DataFrame, table: domain.Table):
         self._ensure_db_created(table)
-
-        df = df[list(map(lambda c: c.name, table.columns))]
+        df = df[list(map(lambda c: c.name, table.columns)) + table.partitions]
 
         if 'created_on' in table.type_dict:
             df['created_on'].fillna(datetime.utcnow(), inplace=True)

@@ -49,40 +49,19 @@ class AwsDal(Dal, ff.LoggerAware):
             'dataset': True,
             'database': table.database.name,
             'table': table.name,
-            'partition_cols': table.partition_columns,
+            'partition_cols': table.partitions,
+            'regular_partitions': True,
             'compression': 'snappy',
             'dtype': table.type_dict,
             'schema_evolution': True,
         }
 
         if table.time_partitioning is not None:
-            params['partition_cols'] = ['dt']
-            # params['projection_enabled'] = True
-            params['regular_partitions'] = True
-            fmt = '%Y'
-            if table.time_partitioning == 'month':
-                fmt += '-%m'
-            if table.time_partitioning == 'day':
-                fmt += '-%m-%d'
-
-            df['dt'] = pd.to_datetime(df[table.time_partitioning_column]).dt.strftime(fmt)
-
-            # params['projection_types'] = {'dt': 'enum'}
-            # params['projection_values'] = {'dt': self._date_partition_range(df, table.time_partitioning)}
+            params['partition_cols'].append('dt')
+            df['dt'] = pd.to_datetime(df[table.time_partitioning_column]).dt.strftime(table.time_partition_format)
 
         if not df.empty:
             wr.s3.to_parquet(**params)
-
-    def _date_partition_range(self, df: pd.DataFrame, timeframe: str):
-        start = df['dt'].min()
-        end = df['dt'].max()
-        fmt = '%Y'
-        if timeframe == 'month':
-            fmt += '-%m'
-        if timeframe == 'day':
-            fmt += '-%m-%d'
-
-        return ','.join(pd.date_range(start, end, freq='MS').strftime(fmt).to_list())
 
     def load(self, table: domain.Table, criteria: ff.BinaryOp = None) -> pd.DataFrame:
         pass

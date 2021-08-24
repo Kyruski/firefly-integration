@@ -15,7 +15,7 @@ class Table:
     path: str = None
     description: str = None
     columns: List[domain.Column] = []
-    partitions: List[domain.Column] = []
+    partitions: List[str] = []
     duplicate_fields: List[str] = []
     duplicate_sort: List[str] = []
     database: domain.Database = None
@@ -25,7 +25,7 @@ class Table:
     file_name: Callable = None
     _partition_generators: Dict[str, Callable] = None
 
-    def __init__(self, name: str, columns: List[domain.Column], partitions: List[domain.Column] = None, path: str = '',
+    def __init__(self, name: str, columns: List[domain.Column], partitions: List[str] = None, path: str = '',
                  description: str = None, duplicate_fields: List[str] = None, duplicate_sort: List[str] = None,
                  partition_generators: Dict[str, Callable] = None, date_grouping: dict = None,
                  file_name: Callable = None, time_partitioning: str = None, time_partitioning_column: str = None):
@@ -53,7 +53,8 @@ class Table:
 
     def generate_partition_path(self, data: pd.DataFrame):
         parts = []
-        for partition in self.partitions:
+        for name in self.partitions:
+            partition = self.get_column(name)
             if self._partition_generators is not None and partition.name in self._partition_generators:
                 parts.append(f'{partition.name}={self._partition_generators[partition.name](data)}')
             elif partition.name in data:
@@ -69,10 +70,6 @@ class Table:
         for column in self.columns:
             ret[column.name] = self._pandas_type(column.data_type)
         return ret
-
-    @property
-    def partition_columns(self):
-        return list(map(lambda c: c.name, self.partitions))
 
     def full_path(self, df: pd.DataFrame = None):
         ret = f'{self.database.path}/{self.path or ""}'.rstrip('/')

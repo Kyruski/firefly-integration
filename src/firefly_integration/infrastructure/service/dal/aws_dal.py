@@ -49,7 +49,7 @@ class AwsDal(Dal, ff.LoggerAware):
             'dataset': True,
             'database': table.database.name,
             'table': table.name,
-            'partition_cols': table.partitions,
+            'partition_cols': table.partitions.copy(),
             'regular_partitions': True,
             'compression': 'snappy',
             'dtype': table.type_dict,

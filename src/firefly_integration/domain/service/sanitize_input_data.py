@@ -42,7 +42,11 @@ class SanitizeInputData(ff.DomainService):
                     except (ValueError, TypeError):
                         df[column.name] = np.nan
                 else:
-                    df[column.name] = df[column.name].astype(column.pandas_type)
+                    try:
+                        df[column.name] = df[column.name].astype(column.pandas_type)
+                    except Exception as e:
+                        if 'assignment destination is read-only' not in str(e):
+                            raise e
 
         columns = list(map(lambda cc: cc.name, table.columns))
         for c in df.columns:

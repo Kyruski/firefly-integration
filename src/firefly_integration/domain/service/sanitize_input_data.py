@@ -44,7 +44,7 @@ class SanitizeInputData(ff.DomainService):
                 else:
                     try:
                         df[column.name] = df[column.name].astype(column.pandas_type)
-                    except Exception as e:
+                    except ValueError as e:
                         if 'assignment destination is read-only' not in str(e):
                             raise e
 
